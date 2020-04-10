@@ -176,7 +176,7 @@ gauge(round(en_investigacion,1), min = 0, max = 100, symbol = '%', gaugeSectors(
 ```
 
 
-Row {data-height=600}
+Row {data-height=800}
 -----------------------------------------------------------------------
 
 
@@ -271,6 +271,49 @@ plotly::layout(
 ```
 
 
+
+
+
+### **Sexo y Rango de edad de fallecidos** (todo el País)
+
+```{r}
+
+library(gsheet)
+fallecidos_Pais <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1vYis6Ts7mQqTY_LtB02L7B6NXDU5kFVhthhg3txrsS8/edit?usp=sharing")
+fallecidos_Pais[fallecidos_Pais$Edad==9999, "Edad"] <- NA
+fallecidos_Pais[fallecidos_Pais$Sexo=="unk", "Sexo"] <- NA
+
+fallecidos_Pais_resumen <- data.frame("Rango_edad" = rep(c("0 a 9","10 a 19","20 a 29","30 a 39", "40 a 49", "50 a 59", "60 a 69", "70 a 79", "80 a 89", "90 a 99", "100+"), 2), "Rango_edad_min" = rep(seq(0,100,10),2), "Rango_edad_max" = rep(seq(10,110,10),2),"Sexo"= c(rep("hombre",11), rep("mujer",11)))
+
+for (i in 1:nrow(fallecidos_Pais_resumen)) {
+  fallecidos_Pais_resumen[i,"Cantidad"] <- nrow(na.omit(fallecidos_Pais[fallecidos_Pais$Edad>=fallecidos_Pais_resumen[i,"Rango_edad_min"] & fallecidos_Pais$Edad<=fallecidos_Pais_resumen[i,"Rango_edad_max"] & fallecidos_Pais$Sexo==fallecidos_Pais_resumen[i,"Sexo"],"Fecha"]))  
+}
+
+# fallecidos_Pais_resumen[fallecidos_Pais_resumen$Sexo=="hombre","Cantidad"] <- -fallecidos_Pais_resumen[fallecidos_Pais_resumen$Sexo=="hombre","Cantidad"]
+# 
+# fallecidos_Pais_resumen$Cantidad_abs <- abs(fallecidos_Pais_resumen$Cantidad)
+# 
+# fallecidos_Pais_resumen %>% 
+#   plot_ly(x= ~Cantidad, y=~Rango_edad_min, color=~Sexo) %>% 
+#   add_bars(orientation = 'h', hoverinfo = 'text', text = ~Cantidad_abs) %>%
+#   layout(bargap = 0.1, barmode = 'overlay',
+#          xaxis = list(tickmode = 'array', tickvals = c(-30, -15, 0, 15, 30),
+#                       ticktext = c('30', '15', '0', '15', '30')))
+
+library(tidyr)
+fallecidos_Pais_resumen_transp  <- spread(fallecidos_Pais_resumen, Sexo, Cantidad)
+
+library(plotly)
+fig <- plot_ly(fallecidos_Pais_resumen_transp, x = ~Rango_edad_min, y = ~hombre, type = 'bar', name = 'Hombres')
+fig <- fig %>% add_trace(y = ~mujer, name = 'Mujeres')
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.9), yaxis = list(title = 'Cantidad de fallecidos'), xaxis = list(title = 'Rango de edades', barmode = 'stack', tickmode = 'array', tickvals = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
+                                             ticktext = c('0 a 9', '10 a 19', '20 a 29', '30 a 39', '40 a 49', '50 a 59', '60 a 69', '70 a 79', '80 a 89', '90 a 99', '+100')))
+
+fig
+
+
+```
+
 Provincias
 =======================================================================
 
@@ -279,7 +322,8 @@ Row {data-height=1400}
   
 ### **Casos confirmados acumulados por provincia** *(para reiniciar la animación recargue la página en su navegador o pulse sobre la imagen)*
 
-<a href="https://raw.githubusercontent.com/lucasbandieri/testeo/gh-pages/gganim.gif" target="_blank">
+
+<a href="https://cenpatgisad.github.io/covid19/gganim.gif" target="_blank">
 <img src="/mnt/28EC75CE33EA541A/temporales/Coronavirus/testeo_web/gganim.gif" class="img-responsive" height="100%"/>    
 </a>
 
@@ -336,7 +380,7 @@ pal <- colorBin("YlOrRd", domain = IND_adm1$Confirmados_acum, bins = bins)
 
 #str(IND_adm1@data)
 
-mapa_Arg <- leaflet() %>% addProviderTiles(providers$Stamen.TerrainBackground) %>% #OpenStreetMap
+mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>% 
   addPolygons(data=IND_adm1, 
               fillColor = ~pal(Confirmados_acum),
               weight = 2,
@@ -356,9 +400,23 @@ mapa_Arg <- leaflet() %>% addProviderTiles(providers$Stamen.TerrainBackground) %
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
                 direction = "auto"))  
-
+mapa_Arg %>% addCircleMarkers(
+  data = por_provincia_mas_reciente_transp[por_provincia_mas_reciente_transp$Provincia=="CABA" & por_provincia_mas_reciente_transp$Clase=="Activos_acum",],
+  lng = ~Long, lat = ~Lat,
+  #                 label=~as.character(cases),
+  #color = ~ pal(type),
+  stroke = TRUE,
+  color = "black",
+  fillOpacity = 0,
+  radius = 10,
+  # popup = leafpop::popupTable(cv_data_for_plot.split[[df]],
+  #                             feature.id = FALSE,
+  #                             row.numbers = FALSE,
+  #                             zcol = c("type", "cases", "Country.Region", "Province.State")
+  )
 mapa_Arg %>% addLegend(pal = pal, values = IND_adm1$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                                                     position = "bottomright")
+
 
 ```
 
