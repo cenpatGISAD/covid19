@@ -399,8 +399,7 @@ mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
               labelOptions = labelOptions(
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
-                direction = "auto"))  
-mapa_Arg %>% addCircleMarkers(
+                direction = "auto"))  %>% addCircleMarkers(
   data = por_provincia_mas_reciente_transp[por_provincia_mas_reciente_transp$Provincia=="CABA" & por_provincia_mas_reciente_transp$Clase=="Activos_acum",],
   lng = ~Long, lat = ~Lat,
   #                 label=~as.character(cases),
@@ -408,12 +407,7 @@ mapa_Arg %>% addCircleMarkers(
   stroke = TRUE,
   color = "black",
   fillOpacity = 0,
-  radius = 10,
-  # popup = leafpop::popupTable(cv_data_for_plot.split[[df]],
-  #                             feature.id = FALSE,
-  #                             row.numbers = FALSE,
-  #                             zcol = c("type", "cases", "Country.Region", "Province.State")
-  )
+  radius = 10)
 mapa_Arg %>% addLegend(pal = pal, values = IND_adm1$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                                                     position = "bottomright")
 
@@ -693,6 +687,8 @@ Recordá informarte siempre a través de medios oficiales. En estos enlaces enco
 **Sitios importantes**
 
 <iframe src="https://www.google.com/maps/d/embed?mid=1QXRzxB8AKa8_P-WbBzv9nsaobqM6-8j5" width="640" height="480"></iframe>
+
+
 
 Sobre esta página
 =======================================================================
