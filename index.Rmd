@@ -113,8 +113,8 @@ Resumen País
   
 ```{r}
 valueBox(
-  value = paste(format(totales_País_mas_reciente$CasosAcum, big.mark = "."), " (", totales_País_mas_reciente$NuevosCasosDia, " en las últimas 24 hs)", "", sep = ""),
-  caption = "Total de casos confirmados",
+  value = paste(format(totales_País_mas_reciente$CasosAcum, big.mark = "."), " (", totales_País_mas_reciente$NuevosCasosDia, " nuevos)", "", sep = ""),
+  caption = "Total de casos confirmados (en las últimas 24 hs)",
   icon = "fas fa-user-md",
   color = confirmed_color
 )
@@ -126,8 +126,8 @@ valueBox(
 ```{r}
 
 valueBox(
-  value = paste(format(totales_País_mas_reciente$FallecAcum, big.mark = "."), " (", totales_País_mas_reciente$NuevosFallec, " en las últimas 24 hs)", "", sep = ""),
-  caption = "Casos de muerte", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  value = paste(format(totales_País_mas_reciente$FallecAcum, big.mark = "."), " (", totales_País_mas_reciente$NuevosFallec, " nuevos)", "", sep = ""),
+  caption = "Casos de muerte (en las últimas 24 hs", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
   icon = "fas fa-heart-broken",
   color = death_color
 )
