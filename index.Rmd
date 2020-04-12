@@ -103,11 +103,11 @@ informes_Chubut_mas_reciente <- gather(informes_Chubut_mas_reciente, Clase, Cont
 
 
 
-IND_adm_Arg <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/Provincias_Argentina_sin_Antartida_ni_Malvinas.shp")
+IND_adm_Arg <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/Provincias_Argentina_sin_Antartida_con_Malvinas.shp")
 proj4string(IND_adm_Arg) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
 
 IND_adm_Arg$Provincia <- c("Santiago del Estero", "Misiones", "Catamarca", "Chaco", "Formosa", "Salta", "Jujuy", "CABA", 
-                        "Tierra del Fuego", "Santa Cruz", "Chubut", "Neuquén", "Río Negro", "La Pampa", "Buenos Aires",
+                        "Tierra del Fuego, Antártida e Islas del Atlántico Sur", "Santa Cruz", "Chubut", "Neuquén", "Río Negro", "La Pampa", "Buenos Aires",
                         "Mendoza", "San Luis", "Entre Ríos", "Córdoba", "San Juan",  "Santa Fe", "La Rioja", "Tucumán", "Corrientes")
 
 
