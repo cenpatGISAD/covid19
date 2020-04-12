@@ -331,12 +331,33 @@ Mapa País
 ### adaptado del ejemplo: https://rstudio.github.io/leaflet/choropleths.html
 
 
+IND_adm_Arg_CABA_zoom <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/CABA_ampliado_y_desplazado.shp")
+proj4string(IND_adm_Arg_CABA_zoom) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+IND_adm_Arg_CABA_zoom$Provincia <- c("CABA")
+
+
+IND_adm_Arg_recuadro_zoom <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/CABA_linea_remarca_area.shp")
+proj4string(IND_adm_Arg_recuadro_zoom) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+IND_adm_Arg_CABA_zoom <- merge(IND_adm_Arg_CABA_zoom, por_provincia_mas_reciente[por_provincia_mas_reciente$Provincia=="CABA",], by = "Provincia")
+
+IND_adm_Arg_CABA_zoom$Texto <- with(IND_adm_Arg_CABA_zoom, paste0('<p>', IND_adm_Arg_CABA_zoom$Provincia,'<p></p>',
+                                        '<p>',"Confirmados: ", IND_adm_Arg_CABA_zoom$Confirmados_acum,  '<p></p>', "Fallecidos: ", IND_adm_Arg_CABA_zoom$Fallecidos_acum,  '</p>',
+                                        '<p>',"Recuperados: ", IND_adm_Arg_CABA_zoom$Recuperados_acum, '<p></p>',"Activos: ", IND_adm_Arg_CABA_zoom$Activos_acum,  '</p>'))
+
+
+library(leaflet)
+paleta_colores <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1y8cgZNJtkaSsKI87S_CxG-QpyJvGAXQZ-VwjFytat7c/edit?usp=sharing")
+pal_ap <- colorFactor(paleta_colores$Color_hex, domain = paleta_colores$Provincia) #paleta_colores$Color_hex
+
+
 bins <- c(0, 1, 10, 20, 50, 100, 200, 500, 1000)
 pal <- colorBin("YlOrRd", domain = IND_adm_Arg$Confirmados_acum, bins = bins)
 
 #str(IND_adm_Arg@data)
 
-mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>% 
+mapa_Arg <- leaflet()  %>% addProviderTiles(providers$Stamen.TerrainBackground) %>% #OpenStreetMap
   addPolygons(data=IND_adm_Arg, 
               fillColor = ~pal(Confirmados_acum),
               weight = 2,
@@ -355,17 +376,31 @@ mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
               labelOptions = labelOptions(
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
-                direction = "auto"))  %>% addCircleMarkers(
-  data = por_provincia_mas_reciente_transp[por_provincia_mas_reciente_transp$Provincia=="CABA" & por_provincia_mas_reciente_transp$Clase=="Activos_acum",],
-  lng = ~Long, lat = ~Lat,
-  #                 label=~as.character(cases),
-  #color = ~ pal(type),
-  stroke = TRUE,
-  color = "black",
-  fillOpacity = 0,
-  radius = 10)
+                direction = "auto"))   %>% 
+  addPolygons(data=IND_adm_Arg_CABA_zoom, 
+              fillColor = ~pal(Confirmados_acum),
+              weight = 2,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.7,
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              #color= ~pal_ap(Provincia), 
+              label = lapply(IND_adm_Arg_CABA_zoom$Texto, htmltools::HTML),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "10px",
+                direction = "auto")) %>% 
+  addPolylines(data=IND_adm_Arg_recuadro_zoom,color = "black", weight = 1)
+
 mapa_Arg %>% addLegend(pal = pal, values = IND_adm_Arg$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                                                     position = "bottomright")
+
 
 
 ```
