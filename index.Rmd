@@ -10,6 +10,7 @@ output:
     vertical_layout: fill
     logo: logo - CENPAT_48x60.png
     favicon: logo - CENPAT_48x60.png
+
 ---
 <style>                     
 .navbar {
@@ -26,6 +27,14 @@ color:white!important;
 ```{r setup, include=FALSE}
 #------------------ Packages ------------------
 library(flexdashboard)
+library(gsheet)
+library(tidyr)
+library(plotly)
+library(maptools)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+
 # install.packages("devtools")                                                    navbar:      - { title: "Ministerio", href: "https://example.com/about", align: right }
 # devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
 # library(coronavirus)
@@ -48,7 +57,7 @@ death_color <- "red"
 #------------------ Data ------------------
 
 #install.packages('gsheet')
-library(gsheet)
+
 totales_País <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1GYOS5gXpVJJZ42A5UhJHJa0_WVRTsAznJ0LCqt5i-Z8/edit?usp=sharing')
 
 totales_País$Fecha <- as.Date(totales_País$Fecha, format = "%d/%m/%Y")
@@ -58,7 +67,23 @@ totales_País_mas_reciente <-totales_País %>%
 
 
 
-library(gsheet)
+fallecidos_Pais <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1vYis6Ts7mQqTY_LtB02L7B6NXDU5kFVhthhg3txrsS8/edit?usp=sharing")
+fallecidos_Pais[fallecidos_Pais$Edad==9999, "Edad"] <- NA
+fallecidos_Pais[fallecidos_Pais$Sexo=="unk", "Sexo"] <- NA
+
+fallecidos_Pais_resumen <- data.frame("Rango_edad" = rep(c("0 a 9","10 a 19","20 a 29","30 a 39", "40 a 49", "50 a 59", "60 a 69", "70 a 79", "80 a 89", "90 a 99", "100+"), 2), "Rango_edad_min" = rep(seq(0,100,10),2), "Rango_edad_max" = rep(seq(10,110,10),2),"Sexo"= c(rep("hombre",11), rep("mujer",11)))
+
+for (i in 1:nrow(fallecidos_Pais_resumen)) {
+  fallecidos_Pais_resumen[i,"Cantidad"] <- nrow(na.omit(fallecidos_Pais[fallecidos_Pais$Edad>=fallecidos_Pais_resumen[i,"Rango_edad_min"] & fallecidos_Pais$Edad<=fallecidos_Pais_resumen[i,"Rango_edad_max"] & fallecidos_Pais$Sexo==fallecidos_Pais_resumen[i,"Sexo"],"Fecha"]))  
+}
+
+
+
+fallecidos_Pais_resumen_transp  <- spread(fallecidos_Pais_resumen, Sexo, Cantidad)
+
+
+
+
 informes_Chubut <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1b3NYFb2I9dUyJXmC6OucDTOpns4FQPWGaNt66opjw-A/edit?usp=sharing')
 
 informes_Chubut$Fecha <- as.Date(informes_Chubut$Fecha, format="%d/%m/%Y")
@@ -73,33 +98,68 @@ informes_Chubut_mas_reciente  <- informes_Chubut %>%
 casos_confirmados_Chubut <- sum(informes_Chubut_mas_reciente$`Casos Confirmados`)
 casos_muerte_Chubut <- sum(informes_Chubut_mas_reciente$`Casos de muerte`)
 
-library(tidyr)
+
 informes_Chubut_mas_reciente <- gather(informes_Chubut_mas_reciente, Clase, Conteo, -Región, -Fecha)
 
-#df <- read.csv2("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/tablas_de_entrada/df.csv")
 
-# df_daily <- coronavirus %>%
-#   dplyr::filter(Country.Region == "Argentina") %>%
-#   dplyr::group_by(date, type) %>%
-#   dplyr::summarise(total = sum(cases, na.rm = TRUE)) %>%
-#   tidyr::pivot_wider(
-#     names_from = type,
-#     values_from = total
-#   ) %>%
-#   dplyr::arrange(date) %>%
-#   dplyr::ungroup() %>%
-#   #dplyr::mutate(active = confirmed - death - recovered) %>%
-#   dplyr::mutate(active = confirmed - death) %>%
-#   dplyr::mutate(
-#     confirmed_cum = cumsum(confirmed),
-#     death_cum = cumsum(death),
-#     # recovered_cum = cumsum(recovered),
-#     active_cum = cumsum(active)
-#   )
-#df_daily <- read.csv2("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/tablas_de_entrada/df_daily.csv", sep=",")
 
-# df1 <- coronavirus %>% dplyr::filter(date == max(date))
-#df1 <- read.csv2("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/tablas_de_entrada/df1.csv", sep=",")
+IND_adm_Arg <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/Provincias_Argentina_sin_Antartida_con_Malvinas.shp")
+proj4string(IND_adm_Arg) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+IND_adm_Arg$Provincia <- c("Santiago del Estero", "Misiones", "Catamarca", "Chaco", "Formosa", "Salta", "Jujuy", "CABA", 
+                        "Tierra del Fuego, Antártida e Islas del Atlántico Sur", "Santa Cruz", "Chubut", "Neuquén", "Río Negro", "La Pampa", "Buenos Aires",
+                        "Mendoza", "San Luis", "Entre Ríos", "Córdoba", "San Juan",  "Santa Fe", "La Rioja", "Tucumán", "Corrientes")
+
+
+por_provincia <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1zUECZoe7nM1QcXIgMRMq3OR2Ui_j1EwggAoY2E_88pw/edit?usp=sharing")
+por_provincia_mas_reciente  <- por_provincia %>% dplyr::filter(Fecha == max(Fecha))
+
+por_provincia_mas_reciente_transp  <- gather(por_provincia_mas_reciente, Clase, Conteo, -Provincia, -Fecha, -Long, -Lat, -Fuente)
+por_provincia_mas_reciente_transp <- por_provincia_mas_reciente_transp  %>% dplyr::filter(Clase != "Confirmados_acum")
+por_provincia_mas_reciente_transp$log_cases <- 2 * log(por_provincia_mas_reciente_transp$Conteo)
+
+
+IND_adm_Arg <- merge(IND_adm_Arg, por_provincia_mas_reciente, by = "Provincia")
+
+IND_adm_Arg$Texto <- with(IND_adm_Arg, paste0('<p>', IND_adm_Arg$Provincia,'<p></p>',
+                                        '<p>',"Confirmados: ", IND_adm_Arg$Confirmados_acum,  '<p></p>', "Fallecidos: ", IND_adm_Arg$Fallecidos_acum,  '</p>',
+                                        '<p>',"Recuperados: ", IND_adm_Arg$Recuperados_acum, '<p></p>',"Activos: ", IND_adm_Arg$Activos_acum,  '</p>'))
+
+
+
+paleta_colores <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1y8cgZNJtkaSsKI87S_CxG-QpyJvGAXQZ-VwjFytat7c/edit?usp=sharing")
+pal_ap <- colorFactor(paleta_colores$Color_hex, domain = paleta_colores$Provincia) #paleta_colores$Color_hex
+
+
+
+IND_adm_Chubut <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/Ministerio_Salud_Chubut/Chubut_poligonos_Areas_programaticas_coronavirus.shp")
+proj4string(IND_adm_Chubut) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+IND_adm_Chubut$Región_larga <- c("Área Programática Comodoro Rivadavia", "Área Programática Esquel", "Área Programática Norte", "Área Programática Trelew")
+
+
+
+reportes_Chubut <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1b3NYFb2I9dUyJXmC6OucDTOpns4FQPWGaNt66opjw-A/edit?usp=sharing")
+reportes_Chubut$Fecha <- as.Date(reportes_Chubut$Fecha, format = "%d/%m/%Y")
+reportes_Chubut_mas_reciente  <- reportes_Chubut %>% dplyr::filter(Fecha == max(Fecha))
+reportes_Chubut_mas_reciente$NOMBRE <- reportes_Chubut_mas_reciente$Región
+
+
+reportes_Chubut_mas_reciente_transp  <- gather(reportes_Chubut_mas_reciente, Clase, Conteo, -Región, -Fecha, -'Casos de muerte', -'Casos Confirmados acumulados', -'Casos de muerte acumulados')
+#reportes_Chubut_mas_reciente_transp <- por_provincia_mas_reciente_transp  %>% dplyr::filter(Clase != "Confirmados_acum")
+
+#unique(reportes_Chubut_mas_reciente_transp$Clase)
+
+IND_adm_Chubut <- merge(IND_adm_Chubut, reportes_Chubut_mas_reciente, by = "NOMBRE")
+
+IND_adm_Chubut$Texto <- with(IND_adm_Chubut, paste0('<p>', IND_adm_Chubut$Región_larga,'<p></p>',
+                                        '<p>',"Confirmados: ", IND_adm_Chubut$`Casos Confirmados`,  '<p></p>', "Confirmados fuera de la prov.: ", IND_adm_Chubut$`Casos Confirmados fuera de la provincia`,  '</p>',
+                                        '<p>',"Casos Sospechosos con Nexo Epidemiológico: ", IND_adm_Chubut$`Casos Sospechosos con Nexo Epidemiológico`, '<p></p>',"Casos Sospechosos IRAG sin Nexo Epidemiológicos: ", IND_adm_Chubut$`Casos Sospechosos IRAG sin Nexo Epidemiológico`,  '</p>',
+                                        '<p></p>',"Casos Sospechosos fuera de la provincia: ", IND_adm_Chubut$`Casos Sospechosos fuera de la provincia`,  '</p>',
+                                        '<p>',"Contactos Estrechos de casos confirmados: ", IND_adm_Chubut$`Contactos Estrechos de casos confirmados`, '<p></p>',"Casos Descartados: ", IND_adm_Chubut$`Casos Descartados`,  '</p>',
+                                        '<p>',"Viajeros con Aislamiento Preventivo: ", IND_adm_Chubut$`Viajeros con Aislamiento Preventivo`, '<p></p>',"Viajeros con Aislamiento Preventivo Finalizado: ", IND_adm_Chubut$`Viajeros con Aislamiento Preventivo Finalizado`,  '</p>'))
+
+
 
 ```
 
@@ -127,7 +187,7 @@ valueBox(
 
 valueBox(
   value = paste(format(totales_País_mas_reciente$FallecAcum, big.mark = "."), " (", totales_País_mas_reciente$NuevosFallec, " nuevos)", "", sep = ""),
-  caption = "Casos de muerte (en las últimas 24 hs", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  caption = "Casos de muerte (en las últimas 24 hs)", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
   icon = "fas fa-heart-broken",
   color = death_color
 )
@@ -217,49 +277,6 @@ plotly::plot_ly(data = totales_País) %>%
     ax = 2,
     ay = -70
   ) %>%
-  # plotly::add_annotations(
-  #   x = as.Date("2020-02-04"),
-  #   y = 1,
-  #   text = paste("First case"),
-  #   xref = "x",
-  #   yref = "y",
-  #   arrowhead = 5,
-  #   arrowhead = 3,
-  #   arrowsize = 1,
-  #   showarrow = TRUE,
-  #   ax = -10,
-#   ay = -90
-# ) %>%
-# plotly::add_annotations(
-#   x = as.Date("2020-03-11"),
-#   y = 3,
-#   text = paste("First death"),
-#   xref = "x",
-#   yref = "y",
-#   arrowhead = 5,
-#   arrowhead = 3,
-#   arrowsize = 1,
-#   showarrow = TRUE,
-#   ax = -90,
-#   ay = -90
-# ) %>%
-# plotly::add_annotations(
-#   x = as.Date("2020-03-18"),
-#   y = 14,
-#   text = paste(
-#     "New containment",
-#     "",
-#     "measures"
-#   ),
-#   xref = "x",
-#   yref = "y",
-#   arrowhead = 5,
-#   arrowhead = 3,
-#   arrowsize = 1,
-#   showarrow = TRUE,
-#   ax = -10,
-#   ay = -90
-# ) %>%
 plotly::layout(
   title = "",
   yaxis = list(title = "Número acumulado de casos"), #range = c(-0.1,5)),
@@ -278,32 +295,6 @@ plotly::layout(
 
 ```{r}
 
-library(gsheet)
-fallecidos_Pais <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1vYis6Ts7mQqTY_LtB02L7B6NXDU5kFVhthhg3txrsS8/edit?usp=sharing")
-fallecidos_Pais[fallecidos_Pais$Edad==9999, "Edad"] <- NA
-fallecidos_Pais[fallecidos_Pais$Sexo=="unk", "Sexo"] <- NA
-
-fallecidos_Pais_resumen <- data.frame("Rango_edad" = rep(c("0 a 9","10 a 19","20 a 29","30 a 39", "40 a 49", "50 a 59", "60 a 69", "70 a 79", "80 a 89", "90 a 99", "100+"), 2), "Rango_edad_min" = rep(seq(0,100,10),2), "Rango_edad_max" = rep(seq(10,110,10),2),"Sexo"= c(rep("hombre",11), rep("mujer",11)))
-
-for (i in 1:nrow(fallecidos_Pais_resumen)) {
-  fallecidos_Pais_resumen[i,"Cantidad"] <- nrow(na.omit(fallecidos_Pais[fallecidos_Pais$Edad>=fallecidos_Pais_resumen[i,"Rango_edad_min"] & fallecidos_Pais$Edad<=fallecidos_Pais_resumen[i,"Rango_edad_max"] & fallecidos_Pais$Sexo==fallecidos_Pais_resumen[i,"Sexo"],"Fecha"]))  
-}
-
-# fallecidos_Pais_resumen[fallecidos_Pais_resumen$Sexo=="hombre","Cantidad"] <- -fallecidos_Pais_resumen[fallecidos_Pais_resumen$Sexo=="hombre","Cantidad"]
-# 
-# fallecidos_Pais_resumen$Cantidad_abs <- abs(fallecidos_Pais_resumen$Cantidad)
-# 
-# fallecidos_Pais_resumen %>% 
-#   plot_ly(x= ~Cantidad, y=~Rango_edad_min, color=~Sexo) %>% 
-#   add_bars(orientation = 'h', hoverinfo = 'text', text = ~Cantidad_abs) %>%
-#   layout(bargap = 0.1, barmode = 'overlay',
-#          xaxis = list(tickmode = 'array', tickvals = c(-30, -15, 0, 15, 30),
-#                       ticktext = c('30', '15', '0', '15', '30')))
-
-library(tidyr)
-fallecidos_Pais_resumen_transp  <- spread(fallecidos_Pais_resumen, Sexo, Cantidad)
-
-library(plotly)
 fig <- plot_ly(fallecidos_Pais_resumen_transp, x = ~Rango_edad_min, y = ~hombre, type = 'bar', name = 'Hombres')
 fig <- fig %>% add_trace(y = ~mujer, name = 'Mujeres')
 fig <- fig %>% layout(legend = list(x = 0.1, y = 0.9), yaxis = list(title = 'Cantidad de fallecidos'), xaxis = list(title = 'Rango de edades', barmode = 'stack', tickmode = 'array', tickvals = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
@@ -331,7 +322,6 @@ Row {data-height=1400}
 
 
 
-
 Mapa País
 =======================================================================
 
@@ -340,34 +330,21 @@ Mapa País
 ```{r}
 ### adaptado del ejemplo: https://rstudio.github.io/leaflet/choropleths.html
 
-library(maptools)
-library(leaflet)
-library(htmltools)
-library(htmlwidgets)
 
-IND_adm1 <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/Provincias_Argentina_sin_Antartida_ni_Malvinas.shp")
-proj4string(IND_adm1) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
+IND_adm_Arg_CABA_zoom <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/CABA_ampliado_y_desplazado.shp")
+proj4string(IND_adm_Arg_CABA_zoom) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
 
-IND_adm1$Provincia <- c("Santiago del Estero", "Misiones", "Catamarca", "Chaco", "Formosa", "Salta", "Jujuy", "CABA", 
-                        "Tierra del Fuego", "Santa Cruz", "Chubut", "Neuquén", "Río Negro", "La Pampa", "Buenos Aires",
-                        "Mendoza", "San Luis", "Entre Ríos", "Córdoba", "San Juan",  "Santa Fe", "La Rioja", "Tucumán", "Corrientes")
+IND_adm_Arg_CABA_zoom$Provincia <- c("CABA")
 
 
-library(gsheet)
-por_provincia <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1zUECZoe7nM1QcXIgMRMq3OR2Ui_j1EwggAoY2E_88pw/edit?usp=sharing")
-por_provincia_mas_reciente  <- por_provincia %>% dplyr::filter(Fecha == max(Fecha))
-# #unique(por_provincia_mas_reciente$Provincia)
-library(tidyr)
-por_provincia_mas_reciente_transp  <- gather(por_provincia_mas_reciente, Clase, Conteo, -Provincia, -Fecha, -Long, -Lat, -Fuente)
-por_provincia_mas_reciente_transp <- por_provincia_mas_reciente_transp  %>% dplyr::filter(Clase != "Confirmados_acum")
-por_provincia_mas_reciente_transp$log_cases <- 2 * log(por_provincia_mas_reciente_transp$Conteo)
+IND_adm_Arg_recuadro_zoom <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/IGN/CABA_linea_remarca_area.shp")
+proj4string(IND_adm_Arg_recuadro_zoom) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
 
+IND_adm_Arg_CABA_zoom <- merge(IND_adm_Arg_CABA_zoom, por_provincia_mas_reciente[por_provincia_mas_reciente$Provincia=="CABA",], by = "Provincia")
 
-IND_adm1 <- merge(IND_adm1, por_provincia_mas_reciente, by = "Provincia")
-
-IND_adm1$Texto <- with(IND_adm1, paste0('<p>', IND_adm1$Provincia,'<p></p>',
-                                        '<p>',"Confirmados: ", IND_adm1$Confirmados_acum,  '<p></p>', "Fallecidos: ", IND_adm1$Fallecidos_acum,  '</p>',
-                                        '<p>',"Recuperados: ", IND_adm1$Recuperados_acum, '<p></p>',"Activos: ", IND_adm1$Activos_acum,  '</p>'))
+IND_adm_Arg_CABA_zoom$Texto <- with(IND_adm_Arg_CABA_zoom, paste0('<p>', IND_adm_Arg_CABA_zoom$Provincia,'<p></p>',
+                                        '<p>',"Confirmados: ", IND_adm_Arg_CABA_zoom$Confirmados_acum,  '<p></p>', "Fallecidos: ", IND_adm_Arg_CABA_zoom$Fallecidos_acum,  '</p>',
+                                        '<p>',"Recuperados: ", IND_adm_Arg_CABA_zoom$Recuperados_acum, '<p></p>',"Activos: ", IND_adm_Arg_CABA_zoom$Activos_acum,  '</p>'))
 
 
 library(leaflet)
@@ -376,12 +353,12 @@ pal_ap <- colorFactor(paleta_colores$Color_hex, domain = paleta_colores$Provinci
 
 
 bins <- c(0, 1, 10, 20, 50, 100, 200, 500, 1000)
-pal <- colorBin("YlOrRd", domain = IND_adm1$Confirmados_acum, bins = bins)
+pal <- colorBin("YlOrRd", domain = IND_adm_Arg$Confirmados_acum, bins = bins)
 
-#str(IND_adm1@data)
+#str(IND_adm_Arg@data)
 
-mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>% 
-  addPolygons(data=IND_adm1, 
+mapa_Arg <- leaflet()  %>% addProviderTiles(providers$Stamen.TerrainBackground) %>% #OpenStreetMap
+  addPolygons(data=IND_adm_Arg, 
               fillColor = ~pal(Confirmados_acum),
               weight = 2,
               opacity = 1,
@@ -395,21 +372,35 @@ mapa_Arg <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
                 fillOpacity = 0.7,
                 bringToFront = TRUE),
               #color= ~pal_ap(Provincia), 
-              label = lapply(IND_adm1$Texto, htmltools::HTML),
+              label = lapply(IND_adm_Arg$Texto, htmltools::HTML),
               labelOptions = labelOptions(
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
-                direction = "auto"))  %>% addCircleMarkers(
-  data = por_provincia_mas_reciente_transp[por_provincia_mas_reciente_transp$Provincia=="CABA" & por_provincia_mas_reciente_transp$Clase=="Activos_acum",],
-  lng = ~Long, lat = ~Lat,
-  #                 label=~as.character(cases),
-  #color = ~ pal(type),
-  stroke = TRUE,
-  color = "black",
-  fillOpacity = 0,
-  radius = 10)
-mapa_Arg %>% addLegend(pal = pal, values = IND_adm1$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
+                direction = "auto"))   %>% 
+  addPolygons(data=IND_adm_Arg_CABA_zoom, 
+              fillColor = ~pal(Confirmados_acum),
+              weight = 2,
+              opacity = 1,
+              color = "white",
+              dashArray = "3",
+              fillOpacity = 0.7,
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              #color= ~pal_ap(Provincia), 
+              label = lapply(IND_adm_Arg_CABA_zoom$Texto, htmltools::HTML),
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "10px",
+                direction = "auto")) %>% 
+  addPolylines(data=IND_adm_Arg_recuadro_zoom,color = "black", weight = 1)
+
+mapa_Arg %>% addLegend(pal = pal, values = IND_adm_Arg$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                                                     position = "bottomright")
+
 
 
 ```
@@ -494,50 +485,6 @@ plotly::plot_ly(data = informes_Chubut) %>%
     ax = 2,
     ay = -70
   ) %>%
-  # plotly::add_annotations(
-  #   x = as.Date("2020-02-04"),
-  #   y = 1,
-  #   text = paste("First case"),
-  #   xref = "x",
-  #   yref = "y",
-  #   arrowhead = 5,
-  #   arrowhead = 3,
-  #   arrowsize = 1,
-  #   showarrow = TRUE,
-  #   ax = -10,
-#   ay = -90
-# ) %>%
-# plotly::add_annotations(
-#   x = as.Date("2020-03-11"),
-#   y = 3,
-#   text = paste("First death"),
-#   xref = "x",
-#   yref = "y",
-#   arrowhead = 5,
-#   arrowhead = 3,
-#   arrowsize = 1,
-#   showarrow = TRUE,
-#   ax = -90,
-#   ay = -90
-# ) %>%
-# plotly::add_annotations(
-#   x = as.Date("2020-03-18"),
-#   y = 14,
-#   text = paste(
-#     "New containment",
-#     "",
-#     "measures"
-#   ),
-#   xref = "x",
-#   yref = "y",
-#   arrowhead = 5,
-#   arrowhead = 3,
-#   arrowsize = 1,
-#   showarrow = TRUE,
-#   ax = -10,
-#   ay = -90
-# ) %>%
-
 plotly::layout(
   title = "",
   yaxis = list(title = "Número acumulado de casos", range = c(-0.1,5)),
@@ -569,53 +516,16 @@ Column {data-width=400}
 ```{r}
 ### adaptado del ejemplo: https://rstudio.github.io/leaflet/choropleths.html
 
-library(maptools)
-library(leaflet)
-library(htmltools)
-library(htmlwidgets)
-
-IND_adm1 <- readShapeSpatial("/mnt/28EC75CE33EA541A/temporales/Coronavirus/estadisticas/Ministerio_Salud_Chubut/Chubut_poligonos_Areas_programaticas_coronavirus.shp")
-proj4string(IND_adm1) <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")
-
-IND_adm1$Región_larga <- c("Área Programática Comodoro Rivadavia", "Área Programática Esquel", "Área Programática Norte", "Área Programática Trelew")
 
 
-library(gsheet)
-reportes_Chubut <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1b3NYFb2I9dUyJXmC6OucDTOpns4FQPWGaNt66opjw-A/edit?usp=sharing")
-reportes_Chubut$Fecha <- as.Date(reportes_Chubut$Fecha, format = "%d/%m/%Y")
-reportes_Chubut_mas_reciente  <- reportes_Chubut %>% dplyr::filter(Fecha == max(Fecha))
-reportes_Chubut_mas_reciente$NOMBRE <- reportes_Chubut_mas_reciente$Región
-
-library(dplyr)
-# Drop the columns of the dataframe
-#reportes_Chubut_mas_reciente <- select (reportes_Chubut_mas_reciente ,-c('Casos Sospechosos fuera de la provincia'))
-
-# #unique(por_provincia_mas_reciente$Provincia)
-library(tidyr)
-reportes_Chubut_mas_reciente_transp  <- gather(reportes_Chubut_mas_reciente, Clase, Conteo, -Región, -Fecha, -'Casos de muerte', -'Casos Confirmados acumulados', -'Casos de muerte acumulados')
-#reportes_Chubut_mas_reciente_transp <- por_provincia_mas_reciente_transp  %>% dplyr::filter(Clase != "Confirmados_acum")
-
-#unique(reportes_Chubut_mas_reciente_transp$Clase)
-
-IND_adm1 <- merge(IND_adm1, reportes_Chubut_mas_reciente, by = "NOMBRE")
-
-IND_adm1$Texto <- with(IND_adm1, paste0('<p>', IND_adm1$Región_larga,'<p></p>',
-                                        '<p>',"Confirmados: ", IND_adm1$`Casos Confirmados`,  '<p></p>', "Confirmados fuera de la prov.: ", IND_adm1$`Casos Confirmados fuera de la provincia`,  '</p>',
-                                        '<p>',"Casos Sospechosos con Nexo Epidemiológico: ", IND_adm1$`Casos Sospechosos con Nexo Epidemiológico`, '<p></p>',"Casos Sospechosos IRAG sin Nexo Epidemiológicos: ", IND_adm1$`Casos Sospechosos IRAG sin Nexo Epidemiológico`,  '</p>',
-                                        '<p></p>',"Casos Sospechosos fuera de la provincia: ", IND_adm1$`Casos Sospechosos fuera de la provincia`,  '</p>',
-                                        '<p>',"Contactos Estrechos de casos confirmados: ", IND_adm1$`Contactos Estrechos de casos confirmados`, '<p></p>',"Casos Descartados: ", IND_adm1$`Casos Descartados`,  '</p>',
-                                        '<p>',"Viajeros con Aislamiento Preventivo: ", IND_adm1$`Viajeros con Aislamiento Preventivo`, '<p></p>',"Viajeros con Aislamiento Preventivo Finalizado: ", IND_adm1$`Viajeros con Aislamiento Preventivo Finalizado`,  '</p>'))
-
-
-library(leaflet)
 
 bins <- c(0, 1, 10, 20, 50, 100, 200, 500, 1000)
-pal <- colorBin("YlOrRd", domain = IND_adm1$`Casos Confirmados`, bins = bins)
+pal <- colorBin("YlOrRd", domain = IND_adm_Chubut$`Casos Confirmados`, bins = bins)
 
-#str(IND_adm1@data)
+#str(IND_adm_Chubut@data)
 
 mapa_Chubut <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>% 
-  addPolygons(data=IND_adm1, 
+  addPolygons(data=IND_adm_Chubut, 
               fillColor = ~pal(`Casos Confirmados`),
               weight = 2,
               opacity = 1,
@@ -629,13 +539,13 @@ mapa_Chubut <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
                 fillOpacity = 0.7,
                 bringToFront = TRUE),
               #color= ~pal_ap(Provincia), 
-              label = lapply(IND_adm1$Texto, htmltools::HTML),
+              label = lapply(IND_adm_Chubut$Texto, htmltools::HTML),
               labelOptions = labelOptions(
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
                 direction = "auto"))  
 
-mapa_Chubut %>% addLegend(pal = pal, values = IND_adm1$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
+mapa_Chubut %>% addLegend(pal = pal, values = IND_adm_Chubut$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                        position = "bottomright") %>%
   addMiniMap(tiles = providers$Esri.WorldStreetMap, width = 120, height=80)
 ```
