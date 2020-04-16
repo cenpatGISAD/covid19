@@ -83,6 +83,27 @@ fallecidos_Pais_resumen_transp  <- spread(fallecidos_Pais_resumen, Sexo, Cantida
 
 
 
+resumenes_diarios_prov_Pat <- gsheet2tbl("https://docs.google.com/spreadsheets/d/18TKGtQ8IrXIKz-zcB1QiT4FzXokKfG3XyQbCxvkO-5w/edit?usp=sharing")
+resumenes_diarios_prov_Pat$Fecha <- as.Date(resumenes_diarios_prov_Pat$Fecha, format="%d/%m/%y")
+
+ultimo_resumen_Río_Negro <- resumenes_diarios_prov_Pat[resumenes_diarios_prov_Pat$Provincia=="Río Negro" & resumenes_diarios_prov_Pat$Fecha== max(resumenes_diarios_prov_Pat$Fecha),]
+
+
+ultimo_resumen_Chubut <- resumenes_diarios_prov_Pat[resumenes_diarios_prov_Pat$Provincia=="Chubut" & resumenes_diarios_prov_Pat$Fecha== max(resumenes_diarios_prov_Pat$Fecha),]
+
+informes_Rio_Negro <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1tA3ehKbp2BZKJZG-cgRijrZCjVla5NUbgcx9MTc3rkU/edit?usp=sharing")
+informes_Rio_Negro$Fecha <- as.Date(informes_Rio_Negro$Fecha, format="%d/%m/%y")
+
+informes_Rio_Negro_mas_reciente  <- informes_Rio_Negro %>% 
+  dplyr::filter(Fecha == max(Fecha))
+
+informes_Rio_Negro_mas_reciente$Texto <- with(informes_Rio_Negro_mas_reciente, paste0('<p>', informes_Rio_Negro_mas_reciente$Localidad,'<p></p>',
+                                        '<p>',"Confirmados: ", informes_Rio_Negro_mas_reciente$Confirmados,  '<p></p>', "Casos sospechosos: ", informes_Rio_Negro_mas_reciente$Sospechosos,  '</p>',
+                                        '<p>',"Activos: ", informes_Rio_Negro_mas_reciente$Activos, '<p></p>',"Fallecidos: ", informes_Rio_Negro_mas_reciente$Fallecidos,  '</p>',
+                                        '<p></p>',"Fecha: ", informes_Rio_Negro_mas_reciente$Fecha,  '</p>'))
+
+
+#informes_Rio_Negro_mas_reciente_transp  <- gather(informes_Rio_Negro_mas_reciente, Clase, Conteo, -Localidad, -Long, -Lat, -Fecha, -Obs, -'Activos', -'Fallecidos', -'Sospechosos')
 
 informes_Chubut <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1b3NYFb2I9dUyJXmC6OucDTOpns4FQPWGaNt66opjw-A/edit?usp=sharing')
 
@@ -92,14 +113,21 @@ informes_Chubut$Fecha_español <- format.Date(informes_Chubut$Fecha, "%d %b %Y",
 informes_Chubut$confirmados_acum <- informes_Chubut$`Casos Confirmados acumulados`
 informes_Chubut$muertos_acum <- informes_Chubut$`Casos de muerte acumulados`
 
+informes_Chubut_sumatoria_diaria <- informes_Chubut %>% # Start by defining the original dataframe, AND THEN...
+  group_by(Fecha) %>% # Define the grouping variable, AND THEN...
+  summarise( # Now you define your summary variables with a name and a function...
+    Observations = n(),  ## The function n() in dlpyr gives you the number of observations
+    confirmados_acum = sum(confirmados_acum),
+    muertos_acum = sum(muertos_acum)
+  )
+
+
 informes_Chubut_mas_reciente  <- informes_Chubut %>% 
   dplyr::filter(Fecha == max(Fecha))
 
 casos_confirmados_Chubut <- sum(informes_Chubut_mas_reciente$`Casos Confirmados`)
 casos_muerte_Chubut <- sum(informes_Chubut_mas_reciente$`Casos de muerte`)
 
-
-informes_Chubut_mas_reciente <- gather(informes_Chubut_mas_reciente, Clase, Conteo, -Región, -Fecha)
 
 
 
@@ -406,6 +434,8 @@ mapa_Arg %>% addLegend(pal = pal, values = IND_adm_Arg$Confirmados_acum, opacity
 
 ```
 
+
+
 Resumen Chubut
 =======================================================================
 
@@ -416,16 +446,47 @@ Row {data-width=400}
 
 ```{r}
 
+
 valueBox(
-  value = paste(format(casos_confirmados_Chubut, big.mark = ","), "", sep = " "),
+  value = paste(format(ultimo_resumen_Chubut$Confirmados_acum, big.mark = ","), "", sep = " "),
   caption = "Total de casos confirmados",
   icon = "fas fa-user-md",
   color = confirmed_color
 )
 ```
 
+### curados {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(ultimo_resumen_Chubut$Curados_acum, big.mark = "."), #" (",
+    #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
+    #"%)",
+    sep = ""
+  ),
+  caption = "Personas curadas", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  icon = "fas fa-heart-broken",
+  color = recovered_color
+)
+```
 
 
+### activos {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(ultimo_resumen_Chubut$Activos_acum, big.mark = "."), #" (",
+    #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
+    #"%)",
+    sep = ""
+  ),
+  caption = "Casos activos", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  icon = "fas fa-heart-broken",
+  color = active_color
+)
+```
 
 
 ### death {.value-box}
@@ -433,7 +494,7 @@ valueBox(
 ```{r}
 
 valueBox(
-  value = paste(format(casos_muerte_Chubut, big.mark = "."), #" (",
+  value = paste(format(ultimo_resumen_Chubut$Fallecidos_acum, big.mark = "."), #" (",
     #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
     #"%)",
     sep = ""
@@ -452,26 +513,48 @@ Row
     
 ```{r}
 
-plotly::plot_ly(data = informes_Chubut) %>%
+
+
+plotly::plot_ly(data = resumenes_diarios_prov_Pat[resumenes_diarios_prov_Pat$Provincia=="Chubut",]) %>%
   plotly::add_trace(
     x = ~Fecha,
     # y = ~active_cum,
-    y = ~confirmados_acum,
+    y = ~Confirmados_acum,
     type = "scatter",
     mode = "lines+markers",
     # name = "Active",
     name = "Confirmados",
+    line = list(color = confirmed_color),
+    marker = list(color = confirmed_color)
+  ) %>%
+    plotly::add_trace(
+    x = ~Fecha,
+    # y = ~active_cum,
+    y = ~Activos_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    # name = "Active",
+    name = "Activos",
     line = list(color = active_color),
     marker = list(color = active_color)
   ) %>%
   plotly::add_trace(
     x = ~Fecha,
-    y = ~muertos_acum,
+    y = ~Fallecidos_acum,
     type = "scatter",
     mode = "lines+markers",
     name = "Muertes",
     line = list(color = death_color),
     marker = list(color = death_color)
+  ) %>%
+  plotly::add_trace(
+    x = ~Fecha,
+    y = ~Curados_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Curados",
+    line = list(color = recovered_color),
+    marker = list(color = recovered_color)
   ) %>%
   plotly::add_annotations(
     x = as.Date("2020-03-03"),
@@ -488,7 +571,155 @@ plotly::plot_ly(data = informes_Chubut) %>%
   ) %>%
 plotly::layout(
   title = "",
-  yaxis = list(title = "Número acumulado de casos", range = c(-0.1,5)),
+  yaxis = list(title = "Número acumulado de casos", range = c(0,(max(ultimo_resumen_Chubut$Confirmados_acum)+10))),
+  #xaxis = list(title = "Fecha"),
+  xaxis = list(
+    type = 'date',
+    title = "Fecha"),#,, tickangle=-90, type='category', 
+            #ticktext=as.list(informes_Chubut$Fecha_español), 
+            #tickvals=as.list(informes_Chubut$Fecha)),#, 
+  #tickformat = "%d %B (%a)<br>%Y"),
+  legend = list(x = 0.1, y = 0.9),
+  hovermode = "compare"
+) 
+```
+
+Resumen Río Negro
+=======================================================================
+
+Row {data-width=400}
+-----------------------------------------------------------------------
+
+### confirmed {.value-box}
+
+```{r}
+
+
+valueBox(
+  value = paste(format(ultimo_resumen_Río_Negro$Confirmados_acum, big.mark = ","), "", sep = " "),
+  caption = "Total de casos confirmados",
+  icon = "fas fa-user-md",
+  color = confirmed_color
+)
+```
+
+### curados {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(ultimo_resumen_Río_Negro$Curados_acum, big.mark = "."), #" (",
+    #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
+    #"%)",
+    sep = ""
+  ),
+  caption = "Personas curadas", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  icon = "fas fa-heart-broken",
+  color = recovered_color
+)
+```
+
+
+### activos {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(ultimo_resumen_Río_Negro$Activos_acum, big.mark = "."), #" (",
+    #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
+    #"%)",
+    sep = ""
+  ),
+  caption = "Casos activos", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  icon = "fas fa-heart-broken",
+  color = active_color
+)
+```
+
+
+### death {.value-box}
+
+```{r}
+
+valueBox(
+  value = paste(format(ultimo_resumen_Río_Negro$Fallecidos_acum, big.mark = "."), #" (",
+    #round(100 * casos_muerte_Chubut / casos_confirmados_Chubut, 1),
+    #"%)",
+    sep = ""
+  ),
+  caption = "Casos de muerte", # (tasa de mortalidad [100*Casos de muerte/Casos confirmados])
+  icon = "fas fa-heart-broken",
+  color = death_color
+)
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### **Casos acumulados diarios** (solo Río Negro)
+    
+```{r}
+
+
+
+plotly::plot_ly(data = resumenes_diarios_prov_Pat[resumenes_diarios_prov_Pat$Provincia=="Río Negro",]) %>%
+  plotly::add_trace(
+    x = ~Fecha,
+    # y = ~active_cum,
+    y = ~Confirmados_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    # name = "Active",
+    name = "Confirmados",
+    line = list(color = confirmed_color),
+    marker = list(color = confirmed_color)
+  ) %>%
+    plotly::add_trace(
+    x = ~Fecha,
+    # y = ~active_cum,
+    y = ~Activos_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    # name = "Active",
+    name = "Activos",
+    line = list(color = active_color),
+    marker = list(color = active_color)
+  ) %>%
+  plotly::add_trace(
+    x = ~Fecha,
+    y = ~Fallecidos_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Muertes",
+    line = list(color = death_color),
+    marker = list(color = death_color)
+  ) %>%
+  plotly::add_trace(
+    x = ~Fecha,
+    y = ~Curados_acum,
+    type = "scatter",
+    mode = "lines+markers",
+    name = "Curados",
+    line = list(color = recovered_color),
+    marker = list(color = recovered_color)
+  ) %>%
+  plotly::add_annotations(
+    x = as.Date("2020-03-03"),
+    y = 0.1,
+    text = paste("Primer caso<br>en Argentina"),
+    xref = "x",
+    yref = "y",
+    arrowhead = 5,
+    arrowhead = 3,
+    arrowsize = 1,
+    showarrow = TRUE,
+    ax = 2,
+    ay = -70
+  ) %>%
+plotly::layout(
+  title = "",
+  yaxis = list(title = "Número acumulado de casos", range = c(0,(max(resumenes_diarios_prov_Pat$Confirmados_acum)+10))),
   #xaxis = list(title = "Fecha"),
   xaxis = list(
     type = 'date',
@@ -502,8 +733,7 @@ plotly::layout(
 ```
 
 
-
-Mapa Chubut
+Mapa Patagonia
 =======================================================================
 
 
@@ -520,10 +750,12 @@ Column {data-width=400}
 
 
 
-bins <- c(0, 1, 10, 20, 50, 100, 200, 500, 1000)
+bins <- c(0, 1, 10, 20, 30, 40, 50, 60, 70)
 pal <- colorBin("YlOrRd", domain = IND_adm_Chubut$`Casos Confirmados`, bins = bins)
 
 #str(IND_adm_Chubut@data)
+
+pal2 <- colorFactor(c("orange", "red", "blue"), domain = c("Activos", "Fallecidos", "Sospechosos"))
 
 mapa_Chubut <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>% 
   addPolygons(data=IND_adm_Chubut, 
@@ -544,7 +776,20 @@ mapa_Chubut <- leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
               labelOptions = labelOptions(
                 style = list("font-weight" = "normal", padding = "3px 8px"),
                 textsize = "10px",
-                direction = "auto"))  
+                 direction = "auto"))  %>% 
+            addCircleMarkers(data = informes_Rio_Negro_mas_reciente,
+                    popup = ~Confirmados,
+                    stroke = FALSE,
+                    radius = ~ifelse(Confirmados > 20, 22, Confirmados),
+                    fillColor = ~pal(`Confirmados`),
+                    label = lapply(informes_Rio_Negro_mas_reciente$Texto, htmltools::HTML),
+                    #fillColor = ~pal(OCD_Program),
+                    fillOpacity = 0.9,
+                      #clusterOptions = markerClusterOptions(removeOutsideVisibleBounds = F),
+         labelOptions = labelOptions(
+           noHide = F,
+           direction = "auto"
+         ))
 
 mapa_Chubut %>% addLegend(pal = pal, values = IND_adm_Chubut$Confirmados_acum, opacity = 0.7, title = "Casos confirmados",
                        position = "bottomright") %>%
